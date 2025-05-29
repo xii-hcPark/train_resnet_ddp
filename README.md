@@ -8,8 +8,9 @@
 - **PyTorch DDP(DistributedDataParallel) 기반 멀티 GPU 학습**
 - **SyncBatchNorm** 적용
 - **가짜 데이터셋(LazyFakeDataset)**: 실제 이미지 대신 무작위 텐서와 라벨을 생성하여 메모리 사용 최소화
-- **100,000개 샘플, 100 에폭 학습**
+- **100,000개 샘플, 100 에폭 학습 (인자로 조정 가능)**
 - **각 GPU별로 학습 진행 상황 및 평균 Loss 출력**
+- **학습 종료 후 rank 0에서만 모델 저장**
 - **AstraGo 환경에서 워크로드 생성/모니터링 테스트에 적합**
 
 ## 파일 구조
@@ -37,17 +38,39 @@ pip install torch torchvision
 2. 아래 명령어로 실행하세요.
 
 ```bash
-python train.py
+python train.py [옵션들]
+```
+
+### 주요 명령줄 인자
+
+| 인자명           | 설명                              | 기본값           |
+|------------------|-----------------------------------|------------------|
+| --epochs         | 학습 에폭 수                      | 100              |
+| --batch-size     | 배치 크기                         | 64               |
+| --dataset-size   | 데이터셋 샘플 수                  | 100000           |
+| --lr             | 학습률                            | 0.001            |
+| --num-workers    | DataLoader num_workers            | 4                |
+| --save-dir       | 모델 저장 디렉토리                | ./checkpoints    |
+| --num-classes    | 분류 클래스 개수                  | 100              |
+
+### 실행 예시
+
+```bash
+python train.py --epochs 50 --batch-size 128 --dataset-size 50000 --lr 0.01 --save-dir ./output
 ```
 
 - GPU가 2개 미만일 경우, 에러 메시지가 출력되고 종료됩니다.
 - GPU가 2개 이상이면, 각 GPU에서 프로세스가 생성되어 분산 학습이 시작됩니다.
 
+### 모델 저장
+
+- 학습이 끝나면 **rank 0 프로세스**에서만 지정한 디렉토리(`--save-dir`)에 `model_final.pth`로 모델이 저장됩니다.
+
 ## 코드 설명
 
 - **LazyFakeDataset**: `__getitem__`에서 무작위 이미지(3x224x224)와 0~99 사이의 라벨을 생성합니다.
 - **setup/cleanup**: DDP 환경 초기화 및 정리 함수입니다.
-- **train**: 각 GPU별로 모델, 데이터로더, 옵티마이저, 손실함수 등을 생성하고 100 에폭 동안 학습을 수행합니다.
+- **train**: 각 GPU별로 모델, 데이터로더, 옵티마이저, 손실함수 등을 생성하고 지정한 에폭 동안 학습을 수행합니다.
 - **main**: 사용 가능한 GPU 개수를 확인하고, 2개 이상일 때만 `mp.spawn`으로 분산 학습을 시작합니다.
 
 ## 참고
